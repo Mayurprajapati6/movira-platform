@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -11,6 +5,464 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  
 }
 
+enum UserRole {
+  ADMIN
+  USER
+  OWNER
+}
+
+enum AccountStatus {
+  ACTIVE
+  UNDER_MONITORING
+  SUSPENDED
+  BANNED
+}
+
+enum FacilityCategory {
+  GYM
+  YOGA
+  SWIMMING
+  DANCE
+}
+
+enum WeekDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum SlotType {
+  MORNING
+  AFTERNOON
+  EVENING
+  FULL_DAY
+}
+
+enum FacilityStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum FacilityApprovalStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PassDurationType {
+  SHORT_TERM
+  LONG_TERM
+}
+
+enum PassStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  DISPUTED
+  REFUNDED
+  EXPIRED
+}
+
+enum HolidayType {
+  FULL_DAY
+  SLOT_BASED
+}
+
+enum AttendanceStatus {
+  UNMARKED
+  MARKED
+  MISSED
+  CANCELLED
+}
+
+enum EscrowStatus {
+  HELD
+  PARTIALLY_RELEASED
+  FULLY_RELEASED
+  PAUSED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum DisputeRaisedBy {
+  USER
+  OWNER
+}
+
+enum DisputeStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  RESOLVED_REFUND
+  RESOLVED_NO_REFUND
+}
+
+enum LedgerEntryType {
+  USER_DEBIT
+  OWNER_DEBIT
+  OWNER_CREDIT
+  PLATFORM_CREDIT
+  REFUND_DEBIT
+  ESCROW_HOLD
+  ESCROW_RELEASE
+}
+
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String   @unique
+  password  String
+
+  name      String
+  city      String?
+
+  role           UserRole      @default(USER)
+  accountStatus  AccountStatus @default(ACTIVE)
+  trustScore     Int           @default(100)
+
+  deletedAt DateTime?
+
+  facilities    Facility[]
+  bookings      Booking[] @relation("BookingUser")
+  ownedBookings Booking[] @relation("BookingOwner")
+  payments      Payment[]
+  ledgerEntries LedgerEntry[]
+  disputes      Dispute[] @relation("UserRaisedDisputes")
+  ownedDisputes Dispute[] @relation("UserOwnedDisputes")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([phone])
+}
+
+model Facility {
+  id        String @id @default(cuid())
+  ownerId   String
+
+  category  FacilityCategory
+  status    FacilityStatus @default(DRAFT)
+
+  name        String
+  city        String
+  state       String
+  address     String
+  description String?
+
+  totalCapacity Int
+  workingDays  WeekDay[]
+
+  approvalStatus FacilityApprovalStatus @default(DRAFT)
+  isPublished    Boolean @default(false)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  images        FacilityImage[]
+  slotTemplates SlotTemplate[]
+  facilitySlots FacilitySlot[]
+  passes        Pass[]
+  bookings      Booking[]
+  holidays      Holiday[]
+  attendances   Attendance[]
+  ledgerEntries LedgerEntry[]
+  disputes      Dispute[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([city])
+  @@index([status])
+  @@index([approvalStatus])
+}
+
+model FacilityImage {
+  id         String @id @default(cuid())
+  facilityId String
+  imageUrl   String
+  isPrimary  Boolean @default(false)
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+}
+
+model SlotTemplate {
+  id         String @id @default(cuid())
+  facilityId String
+
+  slotType  SlotType
+  startTime String
+  endTime   String
+  capacity  Int
+
+  isActive Boolean @default(true)
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@unique([facilityId, slotType])
+}
+
+model FacilitySlot {
+  id         String @id @default(cuid())
+  facilityId String
+
+  date     DateTime @db.Date
+  slotType SlotType
+
+  capacity Int
+  booked   Int     @default(0)
+  isOpen   Boolean @default(true)
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@unique([facilityId, date, slotType])
+  @@index([facilityId, date])
+}
+
+model Holiday {
+  id         String @id @default(cuid())
+  facilityId String
+
+  date     DateTime @db.Date
+  type     HolidayType
+  slotType SlotType?
+
+  reason String?
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@unique([facilityId, date, slotType])
+}
+
+model Pass {
+  id         String @id @default(cuid())
+  facilityId String
+
+  durationType  PassDurationType
+  durationValue Int
+
+  allowedSlots SlotType[]
+  totalUsages  Int
+
+  price  Decimal    @db.Decimal(14, 2)
+  status PassStatus @default(DRAFT)
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Booking {
+  id         String @id @default(cuid())
+  userId     String
+  ownerId    String
+  facilityId String
+  passId     String
+
+  allowedSlots SlotType[]
+
+  passDurationType  PassDurationType
+  passDurationValue Int
+
+  startDate DateTime
+  endDate   DateTime
+
+  totalUsages     Int
+  usedUsages      Int @default(0)
+  remainingUsages Int
+
+  baseAmount   Decimal @db.Decimal(14, 2)
+  platformFee Decimal @db.Decimal(14, 2)
+  totalAmount Decimal @db.Decimal(14, 2)
+
+  status BookingStatus @default(PENDING_PAYMENT)
+
+  idempotencyKey String @unique
+  qrCode         String @unique
+
+  user     User     @relation("BookingUser", fields: [userId], references: [id])
+  owner    User     @relation("BookingOwner", fields: [ownerId], references: [id])
+  facility Facility @relation(fields: [facilityId], references: [id])
+  pass     Pass     @relation(fields: [passId], references: [id])
+
+  attendances Attendance[]
+  escrow      Escrow?
+  payments    Payment[]
+  disputes    Dispute[]
+  ledger      LedgerEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([ownerId])
+  @@index([facilityId])
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+model Attendance {
+  id         String @id @default(cuid())
+  bookingId  String
+  facilityId String
+
+  date     DateTime @db.Date
+  slotType SlotType
+
+  status   AttendanceStatus @default(UNMARKED)
+  markedBy String?
+  markedAt DateTime?
+
+  booking  Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, date, slotType])
+  @@index([facilityId, date])
+}
+
+model Escrow {
+  id        String @id @default(cuid())
+  bookingId String @unique
+
+  totalAmount Decimal @db.Decimal(14, 2)
+  ownerAmount Decimal @db.Decimal(14, 2)
+  platformFee Decimal @db.Decimal(14, 2)
+
+  releasedAmount Decimal @db.Decimal(14, 2) @default(0)
+  status EscrowStatus @default(HELD)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  ledger  EscrowLedger[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EscrowLedger {
+  id        String @id @default(cuid())
+  escrowId  String
+
+  periodNo       Int
+  amount         Decimal  @db.Decimal(14, 2)
+  scheduledDate  DateTime
+  released       Boolean @default(false)
+
+  escrow Escrow @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+}
+
+model LedgerEntry {
+  id String @id @default(cuid())
+
+  userId     String?
+  ownerId    String?
+  facilityId String?
+  bookingId  String?
+
+  type   LedgerEntryType
+  amount Decimal @db.Decimal(14, 2)
+
+  user     User?     @relation(fields: [userId], references: [id])
+  facility Facility? @relation(fields: [facilityId], references: [id])
+  booking  Booking?  @relation(fields: [bookingId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([ownerId])
+  @@index([facilityId])
+}
+
+model Payment {
+  id String @id @default(cuid())
+
+  razorpayOrderId   String @unique
+  razorpayPaymentId String?
+
+  amount   Decimal @db.Decimal(14, 2)
+  currency String @default("INR")
+  status   PaymentStatus @default(PENDING)
+
+  userId    String
+  bookingId String?
+
+  user    User     @relation(fields: [userId], references: [id])
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Dispute {
+  id         String @id @default(cuid())
+  bookingId  String
+  userId     String
+  ownerId    String
+  facilityId String
+
+  raisedBy DisputeRaisedBy
+
+  reason      String
+  description String?
+
+  status DisputeStatus @default(SUBMITTED)
+
+  resolvedByAdminId String?
+  resolutionNote    String?
+  refundAmount      Decimal? @db.Decimal(14,2)
+
+  proofs DisputeProof[]
+
+  booking  Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user     User     @relation("UserRaisedDisputes", fields: [userId], references: [id])
+  owner    User     @relation("UserOwnedDisputes", fields: [ownerId], references: [id])
+  facility Facility @relation(fields: [facilityId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([facilityId])
+  @@index([status])
+}
+
+model DisputeProof {
+  id        String @id @default(cuid())
+  disputeId String
+
+  type       String
+  url        String
+  uploadedBy UserRole
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
