@@ -142,12 +142,16 @@ model User {
   accountStatus AccountStatus @default(ACTIVE)
   trustScore    Int           @default(100)
 
+  resetToken        String?
+  resetTokenExpiry DateTime?
+
   deletedAt DateTime?
 
   facilities    Facility[]
   bookings      Booking[]     @relation("BookingUser")
   ownedBookings Booking[]     @relation("BookingOwner")
   payments      Payment[]
+  refreshTokens RefreshToken[]
   ledgerEntries LedgerEntry[]
   disputes      Dispute[]     @relation("UserRaisedDisputes")
   ownedDisputes Dispute[]     @relation("UserOwnedDisputes")
@@ -158,6 +162,21 @@ model User {
   @@index([email])
   @@index([phone])
   @@index([role])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
 }
 
 model Facility {
