@@ -5,7 +5,7 @@ import v2Router from './routers/v2/index.router';
 import { appErrorHandler, genericErrorHandler } from './middlewares/error.middleware';
 import logger from './config/logger.config';
 import { attachCorrelationIdMiddleware } from './middlewares/correlation.middleware';
-import { prisma } from './config/prisma.js';  // ← ADD THIS
+import { prisma } from './config/prisma.js';  
 
 const app = express();
 
@@ -18,7 +18,7 @@ app.use('/api/v2', v2Router);
 app.use(appErrorHandler);
 app.use(genericErrorHandler);
 
-// Test database connection on startup
+
 prisma.$connect()
     .then(() => {
         logger.info('Database connected successfully');

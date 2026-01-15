@@ -41,7 +41,6 @@ enum SlotType {
   MORNING
   AFTERNOON
   EVENING
-  FULL_DAY
 }
 
 enum FacilityStatus {
@@ -130,43 +129,43 @@ enum LedgerEntryType {
   ESCROW_RELEASE
 }
 
-
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  phone     String   @unique
-  password  String
+  id       String @id @default(cuid())
+  email    String @unique
+  phone    String @unique
+  password String
 
-  name      String
-  city      String?
+  name String
+  city String?
 
-  role           UserRole      @default(USER)
-  accountStatus  AccountStatus @default(ACTIVE)
-  trustScore     Int           @default(100)
+  role          UserRole      @default(USER)
+  accountStatus AccountStatus @default(ACTIVE)
+  trustScore    Int           @default(100)
 
   deletedAt DateTime?
 
   facilities    Facility[]
-  bookings      Booking[] @relation("BookingUser")
-  ownedBookings Booking[] @relation("BookingOwner")
+  bookings      Booking[]     @relation("BookingUser")
+  ownedBookings Booking[]     @relation("BookingOwner")
   payments      Payment[]
   ledgerEntries LedgerEntry[]
-  disputes      Dispute[] @relation("UserRaisedDisputes")
-  ownedDisputes Dispute[] @relation("UserOwnedDisputes")
+  disputes      Dispute[]     @relation("UserRaisedDisputes")
+  ownedDisputes Dispute[]     @relation("UserOwnedDisputes")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
   @@index([phone])
+  @@index([role])
 }
 
 model Facility {
-  id        String @id @default(cuid())
-  ownerId   String
+  id      String @id @default(cuid())
+  ownerId String
 
-  category  FacilityCategory
-  status    FacilityStatus @default(DRAFT)
+  category FacilityCategory
+  status   FacilityStatus   @default(DRAFT)
 
   name        String
   city        String
@@ -175,10 +174,10 @@ model Facility {
   description String?
 
   totalCapacity Int
-  workingDays  WeekDay[]
+  workingDays   WeekDay[]
 
   approvalStatus FacilityApprovalStatus @default(DRAFT)
-  isPublished    Boolean @default(false)
+  isPublished    Boolean                @default(false)
 
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
@@ -202,12 +201,14 @@ model Facility {
 }
 
 model FacilityImage {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   facilityId String
   imageUrl   String
   isPrimary  Boolean @default(false)
 
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId])
 }
 
 model SlotTemplate {
@@ -241,13 +242,14 @@ model FacilitySlot {
 
   @@unique([facilityId, date, slotType])
   @@index([facilityId, date])
+  @@index([facilityId, date, slotType])
 }
 
 model Holiday {
   id         String @id @default(cuid())
   facilityId String
 
-  date     DateTime @db.Date
+  date     DateTime    @db.Date
   type     HolidayType
   slotType SlotType?
 
@@ -256,6 +258,8 @@ model Holiday {
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
 
   @@unique([facilityId, date, slotType])
+  @@index([facilityId, date])
+  @@index([facilityId, date, slotType])
 }
 
 model Pass {
@@ -271,11 +275,14 @@ model Pass {
   price  Decimal    @db.Decimal(14, 2)
   status PassStatus @default(DRAFT)
 
-  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  facility Facility  @relation(fields: [facilityId], references: [id], onDelete: Cascade)
   bookings Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([facilityId])
+  @@index([status])
 }
 
 model Booking {
@@ -297,7 +304,7 @@ model Booking {
   usedUsages      Int @default(0)
   remainingUsages Int
 
-  baseAmount   Decimal @db.Decimal(14, 2)
+  baseAmount  Decimal @db.Decimal(14, 2)
   platformFee Decimal @db.Decimal(14, 2)
   totalAmount Decimal @db.Decimal(14, 2)
 
@@ -354,10 +361,10 @@ model Escrow {
   ownerAmount Decimal @db.Decimal(14, 2)
   platformFee Decimal @db.Decimal(14, 2)
 
-  releasedAmount Decimal @db.Decimal(14, 2) @default(0)
-  status EscrowStatus @default(HELD)
+  releasedAmount Decimal      @default(0) @db.Decimal(14, 2)
+  status         EscrowStatus @default(HELD)
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   ledger  EscrowLedger[]
 
   createdAt DateTime @default(now())
@@ -365,13 +372,13 @@ model Escrow {
 }
 
 model EscrowLedger {
-  id        String @id @default(cuid())
-  escrowId  String
+  id       String @id @default(cuid())
+  escrowId String
 
-  periodNo       Int
-  amount         Decimal  @db.Decimal(14, 2)
-  scheduledDate  DateTime
-  released       Boolean @default(false)
+  periodNo      Int
+  amount        Decimal  @db.Decimal(14, 2)
+  scheduledDate DateTime
+  released      Boolean  @default(false)
 
   escrow Escrow @relation(fields: [escrowId], references: [id], onDelete: Cascade)
 }
@@ -385,7 +392,7 @@ model LedgerEntry {
   bookingId  String?
 
   type   LedgerEntryType
-  amount Decimal @db.Decimal(14, 2)
+  amount Decimal         @db.Decimal(14, 2)
 
   user     User?     @relation(fields: [userId], references: [id])
   facility Facility? @relation(fields: [facilityId], references: [id])
@@ -396,16 +403,17 @@ model LedgerEntry {
   @@index([userId])
   @@index([ownerId])
   @@index([facilityId])
+  @@index([type])
 }
 
 model Payment {
   id String @id @default(cuid())
 
-  razorpayOrderId   String @unique
+  razorpayOrderId   String  @unique
   razorpayPaymentId String?
 
-  amount   Decimal @db.Decimal(14, 2)
-  currency String @default("INR")
+  amount   Decimal       @db.Decimal(14, 2)
+  currency String        @default("INR")
   status   PaymentStatus @default(PENDING)
 
   userId    String
@@ -437,7 +445,7 @@ model Dispute {
 
   resolvedByAdminId String?
   resolutionNote    String?
-  refundAmount      Decimal? @db.Decimal(14,2)
+  refundAmount      Decimal? @db.Decimal(14, 2)
 
   proofs DisputeProof[]
 
