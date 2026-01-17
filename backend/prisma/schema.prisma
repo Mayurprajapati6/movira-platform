@@ -43,15 +43,15 @@ enum SlotType {
   EVENING
 }
 
-enum FacilityStatus {
+enum FacilityLifecycleStatus {
   DRAFT
   ACTIVE
-  INACTIVE
+  PENDING_REVIEW
   SUSPENDED
 }
 
 enum FacilityApprovalStatus {
-  DRAFT
+  NOT_SUBMITTED
   PENDING
   APPROVED
   REJECTED
@@ -142,19 +142,19 @@ model User {
   accountStatus AccountStatus @default(ACTIVE)
   trustScore    Int           @default(100)
 
-  resetToken        String?
+  resetToken       String?
   resetTokenExpiry DateTime?
 
   deletedAt DateTime?
 
   facilities    Facility[]
-  bookings      Booking[]     @relation("BookingUser")
-  ownedBookings Booking[]     @relation("BookingOwner")
+  bookings      Booking[]      @relation("BookingUser")
+  ownedBookings Booking[]      @relation("BookingOwner")
   payments      Payment[]
   refreshTokens RefreshToken[]
   ledgerEntries LedgerEntry[]
-  disputes      Dispute[]     @relation("UserRaisedDisputes")
-  ownedDisputes Dispute[]     @relation("UserOwnedDisputes")
+  disputes      Dispute[]      @relation("UserRaisedDisputes")
+  ownedDisputes Dispute[]      @relation("UserOwnedDisputes")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -179,33 +179,65 @@ model RefreshToken {
   @@index([token])
 }
 
+model Amenity {
+  id       String           @id @default(cuid())
+  name     String
+  category FacilityCategory
+
+  facilities FacilityAmenity[]
+
+  @@unique([name, category])
+}
+
+model FacilityAmenity {
+  id         String @id @default(cuid())
+  facilityId String
+  amenityId  String
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  amenity  Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@unique([facilityId, amenityId])
+  @@index([facilityId])
+}
+
 model Facility {
   id      String @id @default(cuid())
   ownerId String
 
   category FacilityCategory
-  status   FacilityStatus   @default(DRAFT)
+
+  lifecycleStatus FacilityLifecycleStatus @default(DRAFT)
+  approvalStatus  FacilityApprovalStatus  @default(NOT_SUBMITTED)
+
+  isPublished Boolean @default(false)
 
   name        String
+  description String?
+
+  addressLine String
   city        String
   state       String
-  address     String
-  description String?
+  pincode     String
+
+  latitude  Float
+  longitude Float
 
   totalCapacity Int
   workingDays   WeekDay[]
 
-  approvalStatus FacilityApprovalStatus @default(DRAFT)
-  isPublished    Boolean                @default(false)
+  isSubscriptionActive Boolean   @default(false)
+  subscriptionEndsAt   DateTime?
 
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   images        FacilityImage[]
   slotTemplates SlotTemplate[]
   facilitySlots FacilitySlot[]
-  passes        Pass[]
   bookings      Booking[]
+  passes        Pass[]
   holidays      Holiday[]
+  amenities     FacilityAmenity[]
   attendances   Attendance[]
   ledgerEntries LedgerEntry[]
   disputes      Dispute[]
@@ -215,17 +247,23 @@ model Facility {
 
   @@index([ownerId])
   @@index([city])
-  @@index([status])
+  @@index([lifecycleStatus])
   @@index([approvalStatus])
 }
 
 model FacilityImage {
-  id         String  @id @default(cuid())
+  id         String @id @default(cuid())
   facilityId String
-  imageUrl   String
-  isPrimary  Boolean @default(false)
+
+  imageUrl String
+  publicId String
+
+  isPrimary Boolean @default(false)
+  sortOrder Int?
 
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@index([facilityId])
 }
@@ -244,6 +282,7 @@ model SlotTemplate {
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
 
   @@unique([facilityId, slotType])
+  @@index([facilityId])
 }
 
 model FacilitySlot {
@@ -275,6 +314,8 @@ model Holiday {
   reason String?
 
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@unique([facilityId, date, slotType])
   @@index([facilityId, date])

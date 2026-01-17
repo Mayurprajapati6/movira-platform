@@ -12,6 +12,9 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed/amenities.seed.ts"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
