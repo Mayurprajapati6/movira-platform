@@ -197,23 +197,21 @@ model FacilityAmenity {
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
   amenity  Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
 
+  createdAt DateTime @default(now())
+
   @@unique([facilityId, amenityId])
   @@index([facilityId])
+  @@index([amenityId])
 }
 
 model Facility {
   id      String @id @default(cuid())
   ownerId String
-
-  category FacilityCategory
-
-  lifecycleStatus FacilityLifecycleStatus @default(DRAFT)
-  approvalStatus  FacilityApprovalStatus  @default(NOT_SUBMITTED)
-
-  isPublished Boolean @default(false)
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   name        String
   description String?
+  category    FacilityCategory
 
   addressLine String
   city        String
@@ -226,12 +224,19 @@ model Facility {
   totalCapacity Int
   workingDays   WeekDay[]
 
+  lifecycleStatus FacilityLifecycleStatus @default(DRAFT)
+  approvalStatus  FacilityApprovalStatus  @default(NOT_SUBMITTED)
+  isPublished     Boolean                 @default(false)
+
+  approvedAt     DateTime?
+  approvalReason String?   @db.Text
+  approvedData   Json?
+
   isSubscriptionActive Boolean   @default(false)
   subscriptionEndsAt   DateTime?
 
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-
   images        FacilityImage[]
+  history       FacilityHistory[]
   slotTemplates SlotTemplate[]
   facilitySlots FacilitySlot[]
   bookings      Booking[]
@@ -246,26 +251,47 @@ model Facility {
   updatedAt DateTime @updatedAt
 
   @@index([ownerId])
+  @@index([category])
   @@index([city])
   @@index([lifecycleStatus])
   @@index([approvalStatus])
+  @@index([isPublished])
 }
 
 model FacilityImage {
-  id         String @id @default(cuid())
+  id         String   @id @default(cuid())
   facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
 
-  imageUrl String
-  publicId String
+  imageUrl     String
+  publicId     String
+  thumbnailUrl String?
+  mediumUrl    String?
 
   isPrimary Boolean @default(false)
   sortOrder Int?
 
-  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([facilityId])
+  @@index([isPrimary])
+}
+
+model FacilityHistory {
+  id         String   @id @default(cuid())
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  snapshotData Json
+  changedBy    String
+  changeType   String
+  reason       String? @db.Text
 
   createdAt DateTime @default(now())
 
   @@index([facilityId])
+  @@index([createdAt])
+  @@index([changeType])
 }
 
 model SlotTemplate {
